@@ -1,0 +1,11 @@
+pyproject.toml
+codeatlas_contracts/__init__.py
+codeatlas_contracts/enums.py
+codeatlas_contracts/index_job.py
+codeatlas_contracts/repository.py
+codeatlas_contracts/snapshot.py
+codeatlas_contracts.egg-info/PKG-INFO
+codeatlas_contracts.egg-info/SOURCES.txt
+codeatlas_contracts.egg-info/dependency_links.txt
+codeatlas_contracts.egg-info/requires.txt
+codeatlas_contracts.egg-info/top_level.txt

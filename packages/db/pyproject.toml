@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codeatlas-db"
+version = "0.1.0"
+description = "Minimal database base package for CodeAtlas"
+dependencies = [
+    "sqlalchemy>=2.0.0"
+]

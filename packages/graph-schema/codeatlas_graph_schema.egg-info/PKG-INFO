@@ -1,0 +1,4 @@
+Metadata-Version: 2.4
+Name: codeatlas-graph-schema
+Version: 0.1.0
+Summary: Neo4j schema conventions and definitions for CodeAtlas
