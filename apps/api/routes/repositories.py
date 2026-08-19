@@ -4,11 +4,17 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from redis_client import redis_client
 
 from database import get_db
-from models import Repository
-from schemas import RepositoryCreate, RepositoryResponse
+from models import Repository, IndexJob
+from schemas import RepositoryCreate, RepositoryResponse, IndexJobCreateRequest, IndexJobResponse
+from codeatlas_contracts.enums import IndexStatus
+from codeatlas_queue.constants import INDEXING_QUEUE_NAME
+from codeatlas_queue.payloads import IndexJobPayload
+from codeatlas_observability import get_logger
 
+logger = get_logger("codeatlas.api")
 router = APIRouter(prefix="/api/v1/repositories", tags=["Repositories"])
 
 @router.post("", response_model=RepositoryResponse, status_code=status.HTTP_201_CREATED)
@@ -63,3 +69,38 @@ def get_repository_detail(
             detail=f"Repository with ID '{repository_id}' not found."
         )
     return repo
+
+@router.post("/{repository_id}/index", response_model=IndexJobResponse, status_code=status.HTTP_202_ACCEPTED)
+def create_indexing_job(
+    repository_id: uuid.UUID,
+    payload_in: IndexJobCreateRequest = None,
+    db: Session = Depends(get_db)
+):
+    repository = db.scalar(select(Repository).where(Repository.id == repository_id))
+    if not repository:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    job_id = str(uuid.uuid4())
+    ref = payload_in.ref if payload_in else repository.default_branch
+
+    # 1. Record job in PostgreSQL
+    new_job = IndexJob(
+        job_id=job_id,
+        repository_id=repository.id,
+        status=IndexStatus.QUEUED
+    )
+    db.add(new_job)
+    db.commit()
+    db.refresh(new_job)
+
+    # 2. Enqueue payload into Redis
+    queue_payload = IndexJobPayload(
+        job_id=job_id,
+        repository_id=str(repository.id),
+        clone_url=repository.url,
+        ref=ref
+    )
+    redis_client.lpush(INDEXING_QUEUE_NAME, queue_payload.model_dump_json())
+    logger.info(f"Enqueued indexing job {job_id} for repository {repository_id}")
+
+    return new_job

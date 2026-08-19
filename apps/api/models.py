@@ -2,8 +2,9 @@
 import uuid, enum
 from datetime import datetime, timezone
 from typing import List, Optional
-from sqlalchemy import String, DateTime, ForeignKey, Text
+from sqlalchemy import String, DateTime, ForeignKey, Text, Enum as SAEnum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from codeatlas_contracts import IndexStatus
 
 class SnapshotStatus(str, enum.Enum):
     PENDING = "PENDING"
@@ -110,4 +111,53 @@ class Repository(Base):
         "Snapshot", 
         back_populates="repository", 
         cascade="all, delete-orphan"
+    )
+
+    index_jobs: Mapped[List["IndexJob"]] = relationship(
+        "IndexJob",
+        back_populates="repository",
+        cascade="all, delete-orphan"
+    )
+
+class IndexJob(Base):
+    __tablename__ = "index_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, 
+        default=uuid.uuid4
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(36), 
+        unique=True, 
+        index=True, 
+        default=lambda: str(uuid.uuid4())
+    )
+    repository_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("repositories.id", ondelete="CASCADE"), 
+        nullable=False, 
+        index=True
+    )
+    status: Mapped[IndexStatus] = mapped_column(
+        SAEnum(IndexStatus, name="index_status_enum", native_enum=False),
+        default=IndexStatus.QUEUED,
+        nullable=False,
+        index=True,
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text, 
+        nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    repository: Mapped["Repository"] = relationship(
+        "Repository", 
+        back_populates="index_jobs"
     )
